@@ -1,10 +1,10 @@
 # DOOM for GIMP
-GIMP port of DOOM using the prerelease 3.0 API
+This is a GIMP port of DOOM using the prerelease 3.0 API.
 ## What?
 One popular question is "*are you mentally insane?*". I don't quite know the answer to that question.  
 ## How?
 I would not recommend anyone try to port DOOM to GIMP on their own. It has caused me severe brain damage. Yes the spelling mistake is intentional.
-## Setup
+## GIMP Setup
 Pull down the submodules:
 ```bash
 git submodule init
@@ -29,4 +29,13 @@ cd ../../../
 Finally, install the GIMP plugin:
 ```bash
 ./install.sh
+```
+## Input Setup
+Install `pynput`:
+```bash
+pip install pynput
+```
+When you start DOOM in GIMP, run `input-client.py`:
+```bash
+python input-client.py
 ```

@@ -33,16 +33,16 @@ import numpy as np
 print(cdg)
 
 import gi
-gi.require_version('Gimp', '3.0')
+gi.require_version("Gimp", "3.0")
 from gi.repository import Gimp
-gi.require_version('GimpUi', '3.0')
+gi.require_version("GimpUi", "3.0")
 from gi.repository import GimpUi
-gi.require_version('Gegl', '0.4')
+gi.require_version("Gegl", "0.4")
 from gi.repository import Gegl
 from gi.repository import GObject
 from gi.repository import GLib
 from gi.repository import Gio
-gi.require_version('Babl', '0.1')
+gi.require_version("Babl", "0.1")
 from gi.repository import Babl
 
 import os
@@ -75,7 +75,7 @@ class DOOM(Gimp.PlugIn):
 
         procedure.set_menu_label(_("DOOM for GIMP"))
         procedure.set_icon_name(GimpUi.ICON_GEGL)
-        procedure.add_menu_path('<Image>/Games')
+        procedure.add_menu_path("<Image>/Games")
 
         procedure.set_documentation(_("Port of the DOOM engine to GIMP 3.0 Alpha"),
                                     _("Port of the DOOM engine to GIMP 3.0 Alpha"),
@@ -99,9 +99,9 @@ class DOOM(Gimp.PlugIn):
         wad_file = ""
 
         if run_mode == Gimp.RunMode.INTERACTIVE:
-            gi.require_version('Gtk', '3.0')
+            gi.require_version("Gtk", "3.0")
             from gi.repository import Gtk
-            gi.require_version('Gdk', '3.0')
+            gi.require_version("Gdk", "3.0")
             from gi.repository import Gdk
 
             GimpUi.init("gimp-doom.py")
@@ -146,7 +146,7 @@ class DOOM(Gimp.PlugIn):
             Gegl.init(None)
             print(f"INFO: using wad file '{wad_file}'")
 
-            procedure = Gimp.get_pdb().lookup_procedure('gimp-drawable-set-pixel')
+            procedure = Gimp.get_pdb().lookup_procedure("gimp-drawable-set-pixel")
             
             try:
                 shutil.copy(wad_file, os.path.join(os.getcwd(), "DOOM.WAD"))

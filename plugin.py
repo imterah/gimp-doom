@@ -2,6 +2,8 @@
 
 from typing import Optional, Tuple
 
+import threading
+import socket
 import shutil
 import sys
 import os
@@ -49,6 +51,14 @@ import sys
 def N_(message): return message
 def _(message): return GLib.dgettext(None, message)
 
+def read_bytes(conn: socket.socket, bytes_to_read: int) -> bytes:
+    byte_data = bytes()
+
+    while len(byte_data) < bytes_to_read:
+        byte_data += conn.recv(bytes_to_read - len(byte_data))
+    
+    return byte_data
+
 class DOOM(Gimp.PlugIn):
     def do_query_procedures(self):
         return [
@@ -61,15 +71,16 @@ class DOOM(Gimp.PlugIn):
                                             self.run, None)
 
         procedure.set_image_types("*")
-        procedure.set_sensitivity_mask (Gimp.ProcedureSensitivityMask.DRAWABLE)
+        procedure.set_sensitivity_mask(Gimp.ProcedureSensitivityMask.DRAWABLE)
 
-        procedure.set_menu_label(_("DOOM for Python"))
+        procedure.set_menu_label(_("DOOM for GIMP"))
         procedure.set_icon_name(GimpUi.ICON_GEGL)
-        procedure.add_menu_path('<Image>/Filters/Development/greysoh')
+        procedure.add_menu_path('<Image>/Games')
 
-        procedure.set_documentation(_("Plug-in example in Python 3"),
-                                    _("Plug-in example in Python 3"),
+        procedure.set_documentation(_("Port of the DOOM engine to GIMP 3.0 Alpha"),
+                                    _("Port of the DOOM engine to GIMP 3.0 Alpha"),
                                     name)
+        
         procedure.set_attribution("Greyson", "Greyson", "2024")
 
         return procedure
@@ -157,10 +168,39 @@ class DOOM(Gimp.PlugIn):
                 drawable.merge_shadow(True)
                 drawable.update(x, y, width, height)
                 Gimp.displays_flush()
+
+            session_id = len(list(filter(lambda s: s.startswith("doom-inputrelay-"), os.listdir("/tmp/")))) + 1
+            unix_socket_path = f"/tmp/doom-inputrelay-{session_id}"
+
+            current_inputs: list[Tuple[int, int]] = []
+
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(unix_socket_path)
+
+            print("** Input Relay is active **")
+            print(f"with session ID: {session_id}")
+            print(f"with socket path: '{unix_socket_path}'")
+            print("** Input Relay is active **")
+
+            def process_ir_connections():
+                server.listen(1)
+                conn, addr = server.accept()
+
+                while True:
+                    key_status = int(read_bytes(conn, 1)[0])
+                    key = int(read_bytes(conn, 1)[0])
+                    
+                    current_inputs.append((key_status, key))
+
+            ir_thread = threading.Thread(target=process_ir_connections)
+            ir_thread.start()
             
             def get_key() -> Optional[Tuple[int, int]]:
-                return
+                if len(current_inputs) != 0:
+                    key_event = current_inputs.pop(0)
+                    return key_event
             
+            print("Starting DOOM...")
             cdg.init(int(width), int(height), draw_frame, get_key)
             cdg.main()
             

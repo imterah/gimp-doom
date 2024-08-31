@@ -112,9 +112,8 @@ in pkgs.mkShell {
 
   buildInputs = with pkgs; [ 
     gimp299Unstable.gimp
-    python3
-    python312Packages.pip
-    python312Packages.setuptools
-    python312Packages.numpy
+    python310
+    python310Packages.pip
+    python310Packages.setuptools
   ];
 }

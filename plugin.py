@@ -1,9 +1,34 @@
 #!/usr/bin/env python3
 
-# TODO
+from typing import Optional, Tuple
+
+import shutil
 import sys
-sys.path.insert(0, "/home/user/Documents/code/git/gimp-doom/.venv/lib/python3.11/site-packages")
-sys.path.insert(0, "/home/user/Documents/code/git/gimp-doom/.venv/lib64/python3.11/site-packages")
+import os
+
+# getcwd() isn't really accurate. So we have to do this weird stuff
+cwd = sys.argv[0]
+cwd = cwd[:cwd.rindex("/")]
+
+package_dirname   = os.path.join(cwd, "packages")
+package64_dirname = os.path.join(cwd, "packages64")
+
+is_running_doom = False
+
+print(f"INIT: CWD is set to {cwd}")
+
+if os.path.isdir(package_dirname):
+    print("Package repository exists. Adding")
+    sys.path.insert(0, package_dirname)
+
+if os.path.isdir(package64_dirname):
+    print("Package repository (for 64bit libraries) exists. Adding")
+    sys.path.insert(0, package64_dirname)
+
+import cydoomgeneric as cdg
+import numpy as np
+
+print(cdg)
 
 import gi
 gi.require_version('Gimp', '3.0')
@@ -15,6 +40,8 @@ from gi.repository import Gegl
 from gi.repository import GObject
 from gi.repository import GLib
 from gi.repository import Gio
+gi.require_version('Babl', '0.1')
+from gi.repository import Babl
 
 import os
 import sys
@@ -25,7 +52,7 @@ def _(message): return GLib.dgettext(None, message)
 class DOOM(Gimp.PlugIn):
     def do_query_procedures(self):
         return [
-            "plug-in-goat-exercise-python"
+            "plug-in-doom-game"
         ]
 
     def do_create_procedure(self, name):
@@ -36,18 +63,21 @@ class DOOM(Gimp.PlugIn):
         procedure.set_image_types("*")
         procedure.set_sensitivity_mask (Gimp.ProcedureSensitivityMask.DRAWABLE)
 
-        procedure.set_menu_label(_("Plug-In Example in _Python 3"))
+        procedure.set_menu_label(_("DOOM for Python"))
         procedure.set_icon_name(GimpUi.ICON_GEGL)
-        procedure.add_menu_path('<Image>/Filters/Development/Plug-In Examples/')
+        procedure.add_menu_path('<Image>/Filters/Development/greysoh')
 
         procedure.set_documentation(_("Plug-in example in Python 3"),
                                     _("Plug-in example in Python 3"),
                                     name)
-        procedure.set_attribution("Jehan", "Jehan", "2019")
+        procedure.set_attribution("Greyson", "Greyson", "2024")
 
         return procedure
 
     def run(self, procedure, run_mode, image, n_drawables, drawables, config, run_data):
+        if is_running_doom:
+            return procedure.new_return_values(Gimp.PDBStatusType.CANCEL, GLib.Error())
+        
         if n_drawables != 1:
             msg = _("Procedure '{}' only works with one drawable.").format(procedure.get_name())
             error = GLib.Error.new_literal(Gimp.PlugIn.error_quark(), msg, 0)
@@ -55,104 +85,85 @@ class DOOM(Gimp.PlugIn):
         else:
             drawable = drawables[0]
 
+        wad_file = ""
+
         if run_mode == Gimp.RunMode.INTERACTIVE:
             gi.require_version('Gtk', '3.0')
             from gi.repository import Gtk
             gi.require_version('Gdk', '3.0')
             from gi.repository import Gdk
 
-            GimpUi.init("goat-exercise-py3.py")
+            GimpUi.init("gimp-doom.py")
 
             dialog = GimpUi.Dialog(use_header_bar=True,
-                                   title=_("Plug-In Example in Python 3"),
-                                   role="goat-exercise-Python3")
+                                   title=_("Specify WAD File"),
+                                   role="gimp-doom-wad-file")
 
             dialog.add_button(_("_Cancel"), Gtk.ResponseType.CANCEL)
-            dialog.add_button(_("_Source"), Gtk.ResponseType.APPLY)
             dialog.add_button(_("_OK"), Gtk.ResponseType.OK)
 
             geometry = Gdk.Geometry()
-            geometry.min_aspect = 0.5
-            geometry.max_aspect = 1.0
+            geometry.max_aspect = 0.2
             dialog.set_geometry_hints(None, geometry, Gdk.WindowHints.ASPECT)
 
             box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             dialog.get_content_area().add(box)
+
+            text_entry = Gtk.Entry()
+            text_entry.set_text("")
+            box.pack_start(text_entry, True, True, 0)
+
             box.show()
 
-            # XXX We use printf-style string for sharing the localized
-            # string. You may just use recommended Python format() or
-            # any style you like in your plug-ins.
-            head_text=_("This plug-in is an exercise in '%s' to "
-                        "demo plug-in creation.\nCheck out the last "
-                        "version of the source code online by clicking "
-                        "the \"Source\" button.") % ("Python 3")
-            label = Gtk.Label(label=head_text)
-            box.pack_start(label, False, False, 1)
-            label.show()
-
-            contents = None
-            # Get the file contents Python-style instead of using
-            # GLib.file_get_contents() which returns bytes result, and
-            # when converting to string, get newlines as text contents.
-            # Rather than wasting time to figure this out, use Python
-            # core API!
-            with open(os.path.realpath(__file__), 'r') as f:
-                contents = f.read()
-
-            if contents is not None:
-                scrolled = Gtk.ScrolledWindow()
-                scrolled.set_vexpand (True)
-                box.pack_start(scrolled, True, True, 1)
-                scrolled.show()
-
-                view = Gtk.TextView()
-                view.set_wrap_mode(Gtk.WrapMode.WORD)
-                view.set_editable(False)
-                buffer = view.get_buffer()
-                buffer.set_text(contents, -1)
-                scrolled.add(view)
-                view.show()
-
-            while (True):
+            while True:
                 response = dialog.run()
+                
                 if response == Gtk.ResponseType.OK:
+                    wad_file = text_entry.get_text()
                     dialog.destroy()
                     break
-                elif response == Gtk.ResponseType.APPLY:
-                    url = "https://gitlab.gnome.org/GNOME/gimp/-/blob/master/extensions/goat-exercises/goat-exercise-py3.py"
-                    Gio.app_info_launch_default_for_uri(url, None)
-                    continue
                 else:
                     dialog.destroy()
-                    return procedure.new_return_values(Gimp.PDBStatusType.CANCEL,
-                                                       GLib.Error())
+                    return procedure.new_return_values(Gimp.PDBStatusType.CANCEL, GLib.Error())
 
         intersect, x, y, width, height = drawable.mask_intersect()
+
+        if wad_file == "":
+            wad_file = os.path.join(cwd, "doom.wad")
+
         if intersect:
             Gegl.init(None)
+            print(f"INFO: using wad file '{wad_file}'")
 
-            buffer = drawable.get_buffer()
+            procedure = Gimp.get_pdb().lookup_procedure('gimp-drawable-set-pixel')
+            
+            try:
+                shutil.copy(wad_file, os.path.join(os.getcwd(), "DOOM.WAD"))
+            except:
+                print("Could not copy DOOM WAD file!")
+
+                # TODO return types
+                return procedure.new_return_values(Gimp.PDBStatusType.CANCEL, GLib.Error())
+            
+            main_rect = Gegl.Rectangle.new(x, y, width, height)
             shadow_buffer = drawable.get_shadow_buffer()
 
-            graph = Gegl.Node()
-            input = graph.create_child("gegl:buffer-source")
-            input.set_property("buffer", buffer)
-            invert = graph.create_child("gegl:invert")
-            output = graph.create_child("gegl:write-buffer")
-            output.set_property("buffer", shadow_buffer)
-            input.link(invert)
-            invert.link(output)
-            output.process()
+            def draw_frame(pixels: np.ndarray) -> None:
+                pixel_data = bytes(pixels[:,:,[2,1,0]].reshape(-1))
 
-            # This is extremely important in bindings, since we don't
-            # unref buffers. If we don't explicitly flush a buffer, we
-            # may left hanging forever. This step is usually done
-            # during an unref().
-            shadow_buffer.flush()
+                shadow_buffer.set(main_rect, "RGB u8", pixel_data)
+                shadow_buffer.flush()
 
-            drawable.merge_shadow(True)
-            drawable.update(x, y, width, height)
+                drawable.merge_shadow(True)
+                drawable.update(x, y, width, height)
+                Gimp.displays_flush()
+            
+            def get_key() -> Optional[Tuple[int, int]]:
+                return
+            
+            cdg.init(int(width), int(height), draw_frame, get_key)
+            cdg.main()
+            
             Gimp.displays_flush()
 
         return procedure.new_return_values(Gimp.PDBStatusType.SUCCESS, GLib.Error())
